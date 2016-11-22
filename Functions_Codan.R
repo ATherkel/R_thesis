@@ -3,8 +3,8 @@
 
 plot2 <- function(...){
     plot(...,axes = FALSE,mgp = c(2.5,1,0))
-    axis(1, tck = -.055, labels = NA)
-    axis(2, tck = -.055, labels = NA)
+    axis(1, tck = -.015, labels = NA)
+    axis(2, tck = -.015, labels = NA)
     axis(1, lwd = 0, line = -.4)
     axis(2, lwd = 0, line = -.4, las = 2)
     box()
@@ -71,7 +71,7 @@ meanexcess <- function(data, from = 0, to = max(data)*0.4,
 }
 
 
-
+## ---- me_plot_def ----
 
 meplot2 <- function (data, from = 0,omit = 3, labels = TRUE, ...) 
 {
@@ -108,16 +108,52 @@ meplot2 <- function (data, from = 0,omit = 3, labels = TRUE, ...)
 
 
 
+## Configured VGAM::meplot to allow for omition of the last points
+## and anything below a lower bound. 
+meplot3 <- function(y, from = 0,omit = 3, labels = TRUE,main = "Mean Excess Plot", 
+                    xlab = "Threshold", ylab = "Mean Excess", lty = c(2,1,2),
+                    conf = 0.95, col = c("blue", "black", "blue"), 
+                    type = c("l","p","l"),pch = 1,...){
+    if (!is.Numeric(y)) 
+        stop("bad input for argument 'y'")
+    n <- length(y)
+    sy <- sort(y)
+    dsy <- rev(sy)
+    me <- rev(cumsum(dsy))/(n:1) - sy
+    me2 <- rev(cumsum(dsy^2))
+    var <- (me2 - (n:1) * (me + sy)^2)/(n:1)
+    ci <- qnorm((1 + conf)/2) * sqrt(abs(var))/sqrt(n:1)
+    ci[length(ci)] <- NA
+    
+    lower <- which(sy > from)[1]
+    upper <- n - omit
+    bound <- lower + seq_len(max(upper-lower+1,0)) - 1
+    
+    mymat <- cbind(me - ci, me, me + ci)[bound,]
+    sy <- (sy - sqrt(.Machine$double.eps))[bound]
+    matplot(sy, mymat, main = main, xlab = xlab, ylab = ylab, 
+            lty = lty, col = col, type = type, pch = pch,...)
+    invisible(list(threshold = sy, meanExcess = me, plusminus = ci))
+}
 
-myqqplot <- function(qdistr, fit, data,namespace,log = FALSE){
+
+
+
+
+
+
+
+
+qqplot2 <- function(qdistr, fit, data,namespace = NULL,log = FALSE){
     ## qdistr the theoretical distribution quantile function
     ## fit parameters fitted (vector)
     ## data the empirical distribution
     
+    if(is.character(qdistr)) qdistr <- get(qdistr)
+    
     distnametemp <- deparse(substitute(qdistr))
     distnametemp2 <- gsub(".*::","",distnametemp)
     distname <- substring(distnametemp2,2)
-    
     
     main <- paste("QQ-plot of data against the", distname,"distribution")
     ylab <- deparse(substitute(data))

@@ -25,7 +25,7 @@ hillest <- function(data,length,first = 1){
 }
 
 
-which2 <- function(u,data){
+which_list_large <- function(u,data){
     lapply(u, function(x) which(data>x))
 }
 
@@ -41,7 +41,7 @@ meanexcess <- function(data, from = 0, to = max(data)*0.4,
     
     u_vals <- seq(from,to,length.out = length.out)
     
-    delta_n <- which2(u_vals,data)
+    delta_n <- which_list_large(u_vals,data)
     
     # duplicates <- sapply(2:length(delta_n), function(i){
     #     if(length(delta_n[[i]]) == length(delta_n[[i-1]])){
