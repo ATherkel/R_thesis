@@ -1,7 +1,7 @@
 ## Mean excess plotting and other extreme value analytic stuff
 ## such as PBdH plot and PoT method
 
-setwd("~/1_Speciale/R_thesis/")
+# setwd("~/1_Speciale/R_thesis/")
 
 
 
