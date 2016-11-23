@@ -32,9 +32,8 @@ source("Functions_Codan.R")
 par(mfrow = c(1,2))
 barplot(udg,main = "Claim sizes")
 hist(log(udg),50,main = "Histogram of log claim sizes",
-     xlab = "log claim")
+     xlab = "log claim",freq = FALSE)
 par(mfrow = c(1,1))
-
 
 
 
@@ -50,33 +49,54 @@ par(mfrow = c(1,1))
 if("package:VGAM" %in% search()) detach("package:VGAM",unload = TRUE)
 library("actuar")
 library("fitdistrplus")
-fitpar <- fitdist(udg[udg<1e5],distr = "pareto")
-fitlg <- fitdist(udg[udg < 1e5],distr = "lgamma",start = c(1,1))
-# fitexp <- fitdist(log(udg)/log(min(udg)), distr = "exp")
-fitgam <- fitdist(log(udg[udg < 1e5]), distr = "gamma")
-fitln <- fitdist(udg[udg<1e5],distr = "lnorm")
+fitpar <- fitdist(udg,distr = "pareto")
+fitlg <- fitdist(udg,distr = "lgamma",start = c(1,1))
+fitln <- fitdist(udg,distr = "lnorm")
+fitcauchy <- fitdist(udg,distr = "cauchy")
+
+## Log expenses
+fitgam <- fitdist(log(udg), distr = "gamma")
+fitnorm <- fitdist(log(udg), distr = "norm")
+
+
+qqplot(qexp(ppoints(500)),a <- rpareto(1e3,2,1))
+b <- fitdist(a,"exp")
+
+plot(b)
+qqplot2(qexp,b$estimate,a)
+
+## ---- fit_qqplots ----
+
+# par(mfrow = c(2,2))
+qqcomp(fitpar,fitcol = "black", 
+       main = "Q-Q plot Pareto",addlegend = FALSE)
+qqcomp(fitlg, fitcol = "black", 
+       main = "Q-Q plot Log gamma",addlegend = FALSE)
+qqcomp(fitgam,fitcol = "black", 
+       main = "Q-Q plot Gamma (log claim)",addlegend = FALSE)
+qqcomp(fitln, fitcol = "black", 
+       main = "Q-Q plot Log normal",addlegend = FALSE)
+# par(mfrow = c(1,1))
 
 par(mfrow = c(2,2))
-qqcomp(fitpar,fitcol = "black", main = "Q-Q plot Pareto",addlegend = FALSE)
-qqcomp(fitlg, fitcol = "black", main = "Q-Q plot Log gamma",addlegend = FALSE)
-qqcomp(fitgam,fitcol = "black", main = "Q-Q plot Gamma (log claim)",addlegend = FALSE)
-qqcomp(fitln, fitcol = "black", main = "Q-Q plot Log normal",addlegend = FALSE)
-par(mfrow = c(1,1))
+qqplot2(qpareto,fitpar$estimate,udg)
+qqplot2(qlgamma,fitlg$estimate,udg)
+qqplot2(qlnorm,fitln$estimate,udg)
+qqplot2(qcauchy,fitcauchy$estimate,udg)
+
+par(mfrow = c(1,2))
+qqplot2(qgamma,fitgam$estimate,log(udg))
+qqplot2(qnorm,fitnorm$estimate,log(udg))
+
+## ---- test ----
+
+a <- fitgam$estimate[1]
+b <- fitgam$estimate[2]
 
 
-
-qqplot(qpareto(ppoints(500),fitpar$estimate[1],fitpar$estimate[2]),
-       udg,main = "Q-Q plot theoretical Pareto")
-qqline(udg,distribution = function(p) 
-    qpareto(p,fitpar$estimate[1],fitpar$estimate[2]))
-
-qqplot(qlgamma(ppoints(500),fitlg$estimate[1],fitlg$estimate[2]),
-       udg,main = "Q-Q plot theoretical Log gamma")
-qqline(udg,distribution = function(p) 
-    qlgamma(p,fitlg$estimate[1],fitlg$estimate[2]))
-
-qqplot(qgamma(ppoints(500),fitgam$estimate[1],fitgam$estimate),log(udg))
-
+hist(log(udg),100,freq = FALSE)
+curve((dlgamma(x,fitlg$estimate[1],fitlg$estimate[2])),add = TRUE)
+curve((dgamma(x,fitgam$estimate[1],fitgam$estimate[2])),add = TRUE,col  =2)
 
 
 

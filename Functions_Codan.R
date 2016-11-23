@@ -114,7 +114,7 @@ meplot3 <- function(y, from = 0,omit = 3, labels = TRUE,main = "Mean Excess Plot
                     xlab = "Threshold", ylab = "Mean Excess", lty = c(2,1,2),
                     conf = 0.95, col = c("blue", "black", "blue"), 
                     type = c("l","p","l"),pch = 1,...){
-    if (!is.Numeric(y)) 
+    if (!VGAM::is.Numeric(y)) 
         stop("bad input for argument 'y'")
     n <- length(y)
     sy <- sort(y)
