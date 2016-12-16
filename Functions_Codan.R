@@ -138,42 +138,58 @@ meplot3 <- function(y, from = 0,omit = 3, labels = TRUE,main = "Mean Excess Plot
 
 
 
-
-
-
-
-
-
-qqplot2 <- function(qdistr, fit, data,namespace = NULL,log = FALSE){
+qqplot2 <- function(qdistr, fit, data,omit = 3,
+                    namespace = NULL,log = FALSE){
     ## qdistr the theoretical distribution quantile function
     ## fit parameters fitted (vector)
     ## data the empirical distribution
     
-    if(is.character(qdistr)) qdistr <- get(qdistr)
-    
-    distnametemp <- deparse(substitute(qdistr))
+    distnametemp <- paste(substitute(qdistr))
     distnametemp2 <- gsub(".*::","",distnametemp)
     distname <- substring(distnametemp2,2)
     
-    main <- paste("QQ-plot of data against the", distname,"distribution")
+    if(is.character(qdistr)) qdistr <- get(qdistr)
+    
+    
+    main <- paste("QQ-plot of data vs", distname)
     ylab <- deparse(substitute(data))
     
     if(length(fit) == 2){
         xlab <- bquote(paste(.(distname),"(",alpha,",",beta,") = ",.(distname),"(",
                              .(round(fit[1],2)),",",.(round(fit[2],2)),")"))
-        qqplot(qdistr(ppoints(500),fit[1],fit[2]),data,
-               main = main,xlab = xlab,ylab = ylab)
+        out <- qqplot4(qdistr(ppoints(500)[-500],fit[1],fit[2]),data,
+               main = main,xlab = xlab,ylab = ylab,omit = omit)
         qqline(data,distribution = function(p) qdistr(p,fit[1],fit[2]))
     } else { 
         if(length(fit) == 1){
             xlab <- bquote(paste(.(distname),"(",alpha,") = ",.(distname),"(",
                                  .(round(fit[1],2)),",",.(round(fit[2],2)),")"))
-            qqplot(qdistr(ppoints(500),fit),data,
-                   main = main,xlab = xlab,ylab = ylab)
+            out <- qqplot4(qdistr(ppoints(500),fit),data,
+                   main = main,xlab = xlab,ylab = ylab,omit = omit)
             qqline(data,distribution = function(p) qdistr(p,fit[1],fit[2]))
         }
     }
+    invisible(out)
 }
+
+
+qqplot4 <- function (x, y, plot.it = TRUE, xlab = deparse(substitute(x)), 
+                     ylab = deparse(substitute(y)), omit = 3,...) {
+    sx <- sort(x)
+    sy <- sort(y)
+    lenx <- length(sx)
+    leny <- length(sy)
+    if (leny < lenx) 
+        sx <- approx(1L:lenx, sx, n = leny)$y
+    if (leny > lenx) 
+        sy <- approx(1L:leny, sy, n = lenx)$y
+    sx <- sx[1:(length(sx)-omit)]
+    sy <- sy[1:(length(sy)-omit)]
+    if (plot.it) 
+        plot(sx,sy,xlab = xlab, ylab = ylab, ...)
+    invisible(list(x = sx, y = sy))
+}
+
 
 
 ## ---- distributions ----
@@ -183,3 +199,150 @@ qlpareto <- function(p,shape, scale){
         log(qpareto(x,shape,scale))
     })
 }
+
+parloglike <- function(par,data){
+    alpha <- par[1]
+    beta <- par[2]
+    n <- length(data)
+    
+    out <- n*log(alpha)+alpha*n*log(beta) - (alpha+1)*sum(log(beta+data))
+    #     out <- sum(log(dpareto(udg,alpha,beta)))
+    -out
+}
+
+lgloglike <- function(par,data){
+    alpha <- par[1]
+    beta <- par[2]
+    n <- length(data)
+    
+    out <- n*alpha*log(beta) - n * lgamma(alpha) + 
+        sum((alpha-1)*log(log(data))) - sum((beta+1)*log(data))
+    -out
+}
+
+
+
+## Allow for 2*10^5 notation in plots
+pretty10 <- function(x){
+    digits <- 7
+    eT <- floor(log10(abs(x)) + 10^-digits)
+    mT <- signif(x/10^eT, digits)
+    substitute(mT %*% 10^eT)
+}
+
+
+
+
+## ---- evir_myversion ----
+hill2 <- function (data, option = c("alpha", "xi", "quantile"), start = 15, 
+                   end = NA, reverse = FALSE, p = NA, ci = 0.95, auto.scale = TRUE, 
+                   labels = TRUE, ...) 
+{
+    if(!"package:evir" %in% search()) library(evir)
+    dots <- list(...)
+    data <- as.numeric(data)
+    ordered <- rev(sort(data))
+    ordered <- ordered[ordered > 0]
+    n <- length(ordered)
+    option <- match.arg(option)
+    if ((option == "quantile") && (is.na(p))) 
+        stop("Input a value for the probability p")
+    if ((option == "quantile") && (p < 1 - start/n)) {
+        cat("Graph may look strange !! \n\n")
+        cat(paste("Suggestion 1: Increase `p' above", format(signif(1 - 
+                                                                        start/n, 5)), "\n"))
+        cat(paste("Suggestion 2: Increase `start' above ", ceiling(length(data) * 
+                                                                       (1 - p)), "\n"))
+    }
+    k <- 1:n
+    loggs <- logb(ordered)
+    avesumlog <- cumsum(loggs)/(1:n)
+    xihat <- c(NA, (avesumlog - loggs)[2:n])
+    alphahat <- 1/xihat
+    y <- switch(option, alpha = alphahat, xi = xihat, quantile = ordered * 
+                    ((n * (1 - p))/k)^(-1/alphahat))
+    ses <- y/sqrt(k)
+    if (is.na(end)) 
+        end <- n
+    x <- trunc(seq(from = min(end, length(data)), to = start))
+    y <- y[x]
+    x2 <- if("xlim" %in% names(dots)) x[x>=dots$xlim[1] & x<=dots$xlim[2]] else x
+    y2 <- y[which(x %in% x2)]
+    
+    ylabel <- option
+    yrange <- range(y)
+    if (ci && (option != "quantile")) {
+        qq <- qnorm(1 - (1 - ci)/2)
+        u <- y2 + ses[x2] * qq
+        l <- y2 - ses[x2] * qq
+        ylabel <- paste(ylabel, " (CI, p =", ci, ")", sep = "")
+        yrange <- range(u, l)
+    }
+    if (option == "quantile") 
+        ylabel <- paste("Quantile, p =", p)
+
+    index <- x2
+    if (reverse) 
+        index <- -index
+    if (auto.scale) 
+        plot(index, y, ylim = yrange, type = "l", xlab = "", 
+             ylab = "", axes = FALSE, ...)
+    else plot(index, y2, type = "l", xlab = "", ylab = "", axes = FALSE, 
+              ...)
+    axis(1, at = at <- pretty(index,50), labels = paste(pretty(x2,50)))
+    axis(2)
+    threshold <- rev(findthresh(data, x2))
+    
+    at3 <- seq(from = min(index), to = length(data), length.out = 20)
+    
+    axis(3, at = at3, labels = paste(format(signif(threshold[at3], 
+                                                     3))))
+
+    box()
+    if (ci && (option != "quantile")) {
+        lines(index, u, lty = 2, col = 4)
+        lines(index, l, lty = 2, col = 4)
+    }
+    if (labels) {
+        title(xlab = "Order Statistics", ylab = ylabel)
+        mtext("Threshold", side = 3, line = 3)
+    }
+    invisible(list(x = index, y = y))
+}
+
+
+
+pickand <- function(data,k){
+    datastat <- sort(data,TRUE)
+    1/log(2)*log((datastat[k]-datastat[2*k])/
+                     (datastat[2*k] - datastat[4*k]))
+}
+pickand <- Vectorize(pickand,"k")
+
+dedh <- function(data,k){
+    datastat <- sort(data,TRUE)
+    h1 <- mean(log(datastat[1:k])-log(datastat[k+1]))
+    h2 <- 1/k * sum((log(datastat[1:k])-log(datastat[k+1]))^2)
+    1 + h1 + 1/2 * (h1^2/h2 - 1)^(-1)
+}
+dedh <- Vectorize(dedh,"k")
+
+
+
+
+## ---- script_manipulation ----
+
+## Source only a partition of a .R script
+source_work <- function(file,textend,...){
+    ## textend an exact match of a codeline that is the last 
+    ## to be read
+    ## ... optional arguments to readLines
+    text <- readLines(file,...)
+    end <- which(text == ifelse(missing(textend),"## ENDREAD",
+                                textend))
+    con <- textConnection(paste(text[1:end],collapse = "\n"))
+    source(con)
+}
+
+
+
