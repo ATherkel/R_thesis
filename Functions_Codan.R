@@ -110,7 +110,8 @@ meplot2 <- function (data, from = 0,omit = 3, labels = TRUE, ...)
 
 ## Configured VGAM::meplot to allow for omition of the last points
 ## and anything below a lower bound. 
-meplot3 <- function(y, from = 0,omit = 3, labels = TRUE,main = "Mean Excess Plot", 
+meplot3 <- function(y, from = 0,omit = 3, labels = TRUE,
+                    main = "Mean Excess Plot", 
                     xlab = "Threshold", ylab = "Mean Excess", lty = c(2,1,2),
                     conf = 0.95, col = c("blue", "black", "blue"), 
                     type = c("l","p","l"),pch = 1,...){
@@ -136,42 +137,51 @@ meplot3 <- function(y, from = 0,omit = 3, labels = TRUE,main = "Mean Excess Plot
     invisible(list(threshold = sy, meanExcess = me, plusminus = ci))
 }
 
+## ---- mainqqplot ----
 
-
-qqplot2 <- function(qdistr, fit, data,omit = 3,
-                    namespace = NULL,log = FALSE){
-    ## qdistr the theoretical distribution quantile function
+qqplot2 <- function(distr, data,omit = 3, conf = 0.95,
+                    namespace = NULL,log = FALSE, ...){
+    ## distr the theoretical distribution quantile function
     ## fit parameters fitted (vector)
     ## data the empirical distribution
-    
-    distnametemp <- paste(substitute(qdistr))
-    distnametemp2 <- gsub(".*::","",distnametemp)
-    distname <- substring(distnametemp2,2)
-    
-    if(is.character(qdistr)) qdistr <- get(qdistr)
+    ## ... parameter values for distribution
     
     
-    main <- paste("QQ-plot of data vs", distname)
+    qdistr <- get(paste0("q",distr))
+    ddistr <- get(paste0("d",distr))
+    
+    thepoints <- ppoints(500)
+    n <- length(thepoints)
+        
+    main <- paste("QQ-plot of data vs", distr)
     ylab <- deparse(substitute(data))
+    xlab <- paste("Theoretical quantiles of",distr)
     
-    if(length(fit) == 2){
-        xlab <- bquote(paste(.(distname),"(",alpha,",",beta,") = ",.(distname),"(",
-                             .(round(fit[1],2)),",",.(round(fit[2],2)),")"))
-        out <- qqplot4(qdistr(ppoints(500)[-500],fit[1],fit[2]),data,
-               main = main,xlab = xlab,ylab = ylab,omit = omit)
-        qqline(data,distribution = function(p) qdistr(p,fit[1],fit[2]))
-    } else { 
-        if(length(fit) == 1){
-            xlab <- bquote(paste(.(distname),"(",alpha,") = ",.(distname),"(",
-                                 .(round(fit[1],2)),",",.(round(fit[2],2)),")"))
-            out <- qqplot4(qdistr(ppoints(500),fit),data,
+    qdistrpar <- function(p) qdistr(p,...)
+        
+    out <- qqplot4(qdistr(thepoints,...),data,
                    main = main,xlab = xlab,ylab = ylab,omit = omit)
-            qqline(data,distribution = function(p) qdistr(p,fit[1],fit[2]))
-        }
-    }
-    invisible(out)
+    
+    line <- qqline2(data,distribution = qdistrpar)
+    ## Standard error of order statistics (asymptotic)
+    fit.line <- line$int + line$slope * qdistr(thepoints, ...)
+    
+    se <- (line$slope/ddistr(qdistrpar(thepoints), ...))*
+        sqrt(thepoints * (1 - thepoints)/n)
+    
+    err <- se * qnorm(1-(1-conf)/2) 
+    upper <- fit.line + err
+    lower <- fit.line - err
+    
+    lines(qdistrpar(thepoints), upper, lty = 2, col = 2)
+    lines(qdistrpar(thepoints), lower, lty = 2, col = 2)
+
+    invisible(list(out,lower = lower, upper = upper))
 }
 
+qqplot2("pareto",rpareto(1e4,3,5),shape = 3,scale = 5,omit = 1)
+
+## ---- additional ----
 
 qqplot4 <- function (x, y, plot.it = TRUE, xlab = deparse(substitute(x)), 
                      ylab = deparse(substitute(y)), omit = 3,...) {
@@ -185,9 +195,30 @@ qqplot4 <- function (x, y, plot.it = TRUE, xlab = deparse(substitute(x)),
         sy <- approx(1L:leny, sy, n = lenx)$y
     sx <- sx[1:(length(sx)-omit)]
     sy <- sy[1:(length(sy)-omit)]
+    
     if (plot.it) 
         plot(sx,sy,xlab = xlab, ylab = ylab, ...)
     invisible(list(x = sx, y = sy))
+}
+
+
+
+qqline2 <- function (y, datax = FALSE, distribution = qnorm, omit = 3,
+                     probs = c(0.25, 0.75), qtype = 7, ...) {
+    stopifnot(length(probs) == 2, is.function(distribution))
+    y <- y[-tail(y,3)]
+    y <- quantile(y, probs, names = FALSE, type = qtype, na.rm = TRUE)
+    x <- distribution(probs)
+    if (datax) {
+        slope <- diff(x)/diff(y)
+        int <- x[1] - slope * y[1]
+    }
+    else {
+        slope <- diff(y)/diff(x)
+        int <- y[1] - slope * x[1]
+    }
+    abline(int, slope, ...)
+    invisible(list(int = int, slope = slope))
 }
 
 
@@ -249,10 +280,10 @@ hill2 <- function (data, option = c("alpha", "xi", "quantile"), start = 15,
         stop("Input a value for the probability p")
     if ((option == "quantile") && (p < 1 - start/n)) {
         cat("Graph may look strange !! \n\n")
-        cat(paste("Suggestion 1: Increase `p' above", format(signif(1 - 
-                                                                        start/n, 5)), "\n"))
-        cat(paste("Suggestion 2: Increase `start' above ", ceiling(length(data) * 
-                                                                       (1 - p)), "\n"))
+        cat(paste("Suggestion 1: Increase `p' above", 
+                  format(signif(1 - start/n, 5)), "\n"))
+        cat(paste("Suggestion 2: Increase `start' above ", 
+                  ceiling(length(data) * (1 - p)), "\n"))
     }
     k <- 1:n
     loggs <- logb(ordered)
