@@ -1,4 +1,5 @@
-
+library(actuar)
+library(fitdistrplus)
 ## ---- functions ----
 
 plot2 <- function(...){
@@ -137,6 +138,26 @@ meplot3 <- function(y, from = 0,omit = 3, labels = TRUE,
     invisible(list(threshold = sy, meanExcess = me, plusminus = ci))
 }
 
+
+meplot4 <- function(y, from = 0, omit = 10,plot = TRUE,...){
+    n <- length(y)
+    Fn <- ecdf(y)
+    sy <- sort(y)
+    me <- function(x) sum((y-x)*(y>x))/n
+    
+    vals <- sapply(sy, function(x) me(x) / (1-Fn(x)))
+    
+    out <- cbind(sy,vals)[1:(n-omit),]
+    if(plot){
+        plot(out[,1],out[,2],...)
+        invisible(out)
+    } else {
+        out
+    }
+}
+
+
+
 ## ---- mainqqplot ----
 
 qqplot2 <- function(distr, data,omit = 3, conf = 0.95,
@@ -179,7 +200,7 @@ qqplot2 <- function(distr, data,omit = 3, conf = 0.95,
     invisible(list(out,lower = lower, upper = upper))
 }
 
-qqplot2("pareto",rpareto(1e4,3,5),shape = 3,scale = 5,omit = 1)
+# qqplot2("pareto",rpareto(1e4,3,5),shape = 3,scale = 5,omit = 1)
 
 ## ---- additional ----
 
